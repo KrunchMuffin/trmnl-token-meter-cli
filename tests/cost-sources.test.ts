@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { loadConfig } from "../src/config.js";
+import { claudePathRole } from "../src/cost-sources/claude-projects.js";
 import { readOpenCodeSqliteSource } from "../src/cost-sources/opencode-sqlite.js";
 import { localDateKey } from "../src/cost-sources/jsonl.js";
 import { readPriorityEvidence } from "../src/cost-sources/priority-sqlite.js";
@@ -793,6 +794,7 @@ describe("local cost sources", () => {
   });
 
   it("reports missing, unreadable, and malformed OpenCode SQLite status without exposing SQL details", async () => {
+    const canRevokeReadAccess = process.platform !== "win32" && process.getuid?.() !== 0;
     const root = await makeTempRoot();
     const unreadableDb = join(root, "unreadable.db");
     const malformedDb = join(root, "malformed.db");
@@ -824,16 +826,20 @@ describe("local cost sources", () => {
       },
       warnings: [{ code: "opencode_sqlite_missing", severity: "warning" }]
     });
-    expect(unreadable).toMatchObject({
-      records: [],
-      status: {
-        kind: "opencode_sqlite",
-        enabled: true,
-        status: "unreadable",
-        warning_code: "opencode_sqlite_unreadable"
-      },
-      warnings: [{ code: "opencode_sqlite_unreadable", severity: "warning" }]
-    });
+    // Windows ignores POSIX read bits and root bypasses them, so an unreadable
+    // file can only be simulated for an unprivileged POSIX user.
+    if (canRevokeReadAccess) {
+      expect(unreadable).toMatchObject({
+        records: [],
+        status: {
+          kind: "opencode_sqlite",
+          enabled: true,
+          status: "unreadable",
+          warning_code: "opencode_sqlite_unreadable"
+        },
+        warnings: [{ code: "opencode_sqlite_unreadable", severity: "warning" }]
+      });
+    }
     expect(malformed).toMatchObject({
       records: [],
       status: {
@@ -1243,5 +1249,13 @@ describe("local cost sources", () => {
     expect(result.records[0]?.priority_tier).toBe("priority");
     expect(result.records[0]?.model).toBe("gpt-5.5");
     expect(JSON.stringify(result)).not.toContain("response.create");
+  });
+
+  it("detects Claude subagent transcripts with POSIX and Windows separators", () => {
+    expect(claudePathRole("/home/dev/.claude/projects/p/s/subagents/agent-1.jsonl")).toBe("subagent");
+    expect(claudePathRole("C:\\Users\\dev\\.claude\\projects\\p\\s\\subagents\\agent-1.jsonl")).toBe(
+      "subagent"
+    );
+    expect(claudePathRole("C:\\Users\\dev\\.claude\\projects\\p\\stream.jsonl")).toBe("parent");
   });
 });

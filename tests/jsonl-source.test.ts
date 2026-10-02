@@ -2,11 +2,12 @@ import { describe, expect, it } from "vitest";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
 import { buildAggregate } from "../src/aggregate.js";
 import { readJsonlUsageSource } from "../src/cost-sources/jsonl.js";
 
-const fixtureRoot = new URL("./fixtures/codex-jsonl/default", import.meta.url).pathname;
-const nestedFixtureRoot = new URL("./fixtures/codex-jsonl/nested", import.meta.url).pathname;
+const fixtureRoot = fileURLToPath(new URL("./fixtures/codex-jsonl/default", import.meta.url));
+const nestedFixtureRoot = fileURLToPath(new URL("./fixtures/codex-jsonl/nested", import.meta.url));
 
 const readCodexFixture = (root: string) =>
   readJsonlUsageSource(root, "codex_sessions", "codex_sessions_missing");

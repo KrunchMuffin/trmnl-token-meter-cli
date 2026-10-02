@@ -1,8 +1,9 @@
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { buildAggregate } from "../src/aggregate.js";
 import { readJsonlUsageSource } from "../src/cost-sources/jsonl.js";
 
-const fixtureRoot = new URL("./fixtures/codex-jsonl/custom", import.meta.url).pathname;
+const fixtureRoot = fileURLToPath(new URL("./fixtures/codex-jsonl/custom", import.meta.url));
 
 describe("fork-aware aggregation", () => {
   it("deduplicates cumulative counters per branch and emits ambiguity warnings", async () => {

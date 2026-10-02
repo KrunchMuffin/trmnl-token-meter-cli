@@ -1,9 +1,10 @@
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const fixtureRoot = new URL("./fixtures/codex-jsonl/default", import.meta.url).pathname;
+const fixtureRoot = fileURLToPath(new URL("./fixtures/codex-jsonl/default", import.meta.url));
 
 describe("background sync entrypoint", () => {
   const originalEnv = { ...process.env };

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { realpathSync } from "node:fs";
 import { hostname } from "node:os";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { buildAggregate } from "./aggregate.js";
 import {
   deleteCredential,
@@ -39,6 +39,7 @@ import {
   type CollectorCredential,
   type ProviderStatus
 } from "./types.js";
+import { applyServiceEnvFile } from "./service-env.js";
 import { updateNotice } from "./update-check.js";
 import type { SourceProvider } from "./types.js";
 import { parseProviders, providerLabels, SUPPORTED_PROVIDERS } from "./source-providers.js";
@@ -583,6 +584,10 @@ Paired meter: ${credential.machine_label}
 
 export async function main(argv = process.argv.slice(2)): Promise<void> {
   const [command = "collect", ...args] = argv;
+  // Windows Task Scheduler cannot set per-task environment variables, so the
+  // scheduled job passes the service environment as an allowlisted JSON file.
+  const serviceEnvPath = argValue(args, "--service-env");
+  if (serviceEnvPath) await applyServiceEnvFile(serviceEnvPath);
   const loadedConfig = loadConfig();
   const config = {
     ...loadedConfig,
@@ -625,7 +630,7 @@ function isDirectCliExecution(): boolean {
   try {
     return realpathSync(fileURLToPath(import.meta.url)) === realpathSync(entrypoint);
   } catch {
-    return import.meta.url === `file://${entrypoint}`;
+    return import.meta.url === pathToFileURL(entrypoint).href;
   }
 }
 

@@ -69,25 +69,42 @@ export function normalizeApiBaseUrl(
   return url.toString().replace(/\/+$/, "");
 }
 
-function defaultConfigDir(): string {
-  if (process.env.TRMNL_TOKEN_METER_CONFIG_DIR) return process.env.TRMNL_TOKEN_METER_CONFIG_DIR;
-  if (platform() === "darwin") {
-    return join(homedir(), "Library", "Application Support", "trmnl-token-meter");
+/**
+ * Per-platform default config and cache directories. Windows keeps both under
+ * `%LOCALAPPDATA%` rather than the roaming `%APPDATA%` profile: the collector
+ * credential and service runner are bound to this machine and must not follow a
+ * roaming profile to another computer.
+ */
+export function defaultCollectorDirs(
+  env: NodeJS.ProcessEnv = process.env,
+  os: NodeJS.Platform = platform(),
+  home: string = homedir()
+): { configDir: string; cacheDir: string } {
+  if (os === "darwin") {
+    return {
+      configDir: join(home, "Library", "Application Support", "trmnl-token-meter"),
+      cacheDir: join(home, "Library", "Caches", "trmnl-token-meter")
+    };
   }
-  return join(process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config"), "trmnl-token-meter");
-}
-
-function defaultCacheDir(): string {
-  if (process.env.TRMNL_TOKEN_METER_CACHE_DIR) return process.env.TRMNL_TOKEN_METER_CACHE_DIR;
-  if (platform() === "darwin") return join(homedir(), "Library", "Caches", "trmnl-token-meter");
-  return join(process.env.XDG_CACHE_HOME ?? join(homedir(), ".cache"), "trmnl-token-meter");
+  if (os === "win32") {
+    const localAppData = env.LOCALAPPDATA?.trim() || join(home, "AppData", "Local");
+    return {
+      configDir: join(localAppData, "trmnl-token-meter", "Config"),
+      cacheDir: join(localAppData, "trmnl-token-meter", "Cache")
+    };
+  }
+  return {
+    configDir: join(env.XDG_CONFIG_HOME ?? join(home, ".config"), "trmnl-token-meter"),
+    cacheDir: join(env.XDG_CACHE_HOME ?? join(home, ".cache"), "trmnl-token-meter")
+  };
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): CollectorConfig {
   const codexHome =
     env.CODEX_HOME && env.CODEX_HOME.trim() ? env.CODEX_HOME : join(homedir(), ".codex");
-  const configDir = env.TRMNL_TOKEN_METER_CONFIG_DIR ?? defaultConfigDir();
-  const cacheDir = env.TRMNL_TOKEN_METER_CACHE_DIR ?? defaultCacheDir();
+  const defaultDirs = defaultCollectorDirs(env);
+  const configDir = env.TRMNL_TOKEN_METER_CONFIG_DIR ?? defaultDirs.configDir;
+  const cacheDir = env.TRMNL_TOKEN_METER_CACHE_DIR ?? defaultDirs.cacheDir;
   const apiBaseUrl = env.TRMNL_TOKEN_METER_API_BASE_URL ?? DEFAULT_API_BASE_URL;
   const claudeProjectsInput =
     env.TRMNL_TOKEN_METER_CLAUDE_PROJECTS_HOME ?? env.TRMNL_TOKEN_METER_CLAUDE_CONFIG_DIR ?? env.CLAUDE_CONFIG_DIR;

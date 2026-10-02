@@ -1,6 +1,7 @@
 import { chmod, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { buildAggregate } from "../src/aggregate.js";
 import { loadConfig } from "../src/config.js";
@@ -9,7 +10,7 @@ import { findPricingModel } from "../src/pricing/index.js";
 import { serializeAggregateForUpload } from "../src/upload.js";
 import type { AggregateSnapshot, SourceProvider } from "../src/types.js";
 
-const fixtureRoot = new URL("./fixtures/codex-jsonl/default", import.meta.url).pathname;
+const fixtureRoot = fileURLToPath(new URL("./fixtures/codex-jsonl/default", import.meta.url));
 const NOW = new Date("2026-05-15T12:00:00.000Z");
 const TODAY = "2026-05-15";
 const YESTERDAY = "2026-05-14";
@@ -110,8 +111,12 @@ const collect = async (
   });
 };
 
+// The stand-in CodexBar is a POSIX shell script. CodexBar itself does not ship
+// for Windows, where discovery is covered by tests/codexbar-cli.test.ts.
+const itWithFakeCodexBar = it.skipIf(process.platform === "win32");
+
 describe("CodexBar cost source", () => {
-  it("prices a model the bundled catalog does not know", async () => {
+  itWithFakeCodexBar("prices a model the bundled catalog does not know", async () => {
     // The premise of this test: without CodexBar this model has no local price.
     expect(findPricingModel(UNCATALOGUED_MODEL)).toBeNull();
 
@@ -160,7 +165,7 @@ describe("CodexBar cost source", () => {
     expect(snapshot.collector.codexbar.providers).toEqual([]);
   });
 
-  it("replaces the local scan for the providers CodexBar priced", async () => {
+  itWithFakeCodexBar("replaces the local scan for the providers CodexBar priced", async () => {
     const local = await collect({ TRMNL_TOKEN_METER_CODEXBAR: "off" }, ["codex"]);
     expect(local.periods.today.total_tokens).toBe(215);
 
@@ -196,7 +201,7 @@ describe("CodexBar cost source", () => {
     );
   });
 
-  it("keeps the local scan for a provider CodexBar could not price", async () => {
+  itWithFakeCodexBar("keeps the local scan for a provider CodexBar could not price", async () => {
     const binary = await installFakeCodexBar([
       { provider: "codex", error: { message: "cookie source is Off" }, daily: [] }
     ]);
@@ -208,7 +213,7 @@ describe("CodexBar cost source", () => {
     expect(snapshot.collector.codexbar.providers).toEqual([]);
   });
 
-  it("falls back to the local scan when the CodexBar scan fails", async () => {
+  itWithFakeCodexBar("falls back to the local scan when the CodexBar scan fails", async () => {
     const binary = await installFakeCodexBar([], { exitCode: 1, stdout: "boom" });
 
     const snapshot = await collect({ CODEXBAR_BIN: binary }, ["codex"]);
@@ -221,7 +226,7 @@ describe("CodexBar cost source", () => {
     expect(snapshot.collector.codexbar.available).toBe(false);
   });
 
-  it("falls back to the bundled catalog for a row CodexBar left unpriced", async () => {
+  itWithFakeCodexBar("falls back to the bundled catalog for a row CodexBar left unpriced", async () => {
     const binary = await installFakeCodexBar([
       {
         provider: "claude",
@@ -247,7 +252,7 @@ describe("CodexBar cost source", () => {
     );
   });
 
-  it("marks a window that mixes pricing engines", async () => {
+  itWithFakeCodexBar("marks a window that mixes pricing engines", async () => {
     const binary = await installFakeCodexBar([
       {
         provider: "claude",
@@ -282,7 +287,7 @@ describe("CodexBar cost source", () => {
     ]);
   });
 
-  it("keeps CodexBar workspace names and paths out of the upload payload", async () => {
+  itWithFakeCodexBar("keeps CodexBar workspace names and paths out of the upload payload", async () => {
     const binary = await installFakeCodexBar([
       {
         provider: "claude",

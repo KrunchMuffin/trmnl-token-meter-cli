@@ -6,8 +6,16 @@ import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import type { CollectorConfig } from "./config.js";
-import { CONFIG_DISABLED_PROVIDERS_SENTINEL } from "./config.js";
-import { COLLECTOR_VERSION, type CollectorCredential, type SourceProvider } from "./types.js";
+import { envForService } from "./service-env.js";
+import {
+  installScheduledTask,
+  scheduledTaskInstalled,
+  uninstallScheduledTask,
+  windowsNodeLauncherCandidates
+} from "./service-windows.js";
+import { COLLECTOR_VERSION, type CollectorCredential } from "./types.js";
+
+export { envForService } from "./service-env.js";
 
 const execFileAsync = promisify(execFile);
 const SERVICE_LABEL = "com.trmnl.token-meter.sync";
@@ -16,7 +24,7 @@ const CRON_END = "# END trmnl-token-meter";
 
 export interface ServiceMetadata {
   installed_at: string;
-  method: "launchd" | "systemd" | "cron";
+  method: "launchd" | "systemd" | "cron" | "schtasks";
   runner: string;
   interval_minutes: number;
   runner_version?: string;
@@ -82,6 +90,7 @@ const shellQuote = (value: string): string => `'${value.replaceAll("'", "'\\''")
  * the formula is upgraded and the old shared libraries are removed.
  */
 function defaultNodeLauncherCandidates(home = homedir()): string[] {
+  if (platform() === "win32") return windowsNodeLauncherCandidates(process.env, home);
   return [
     "/opt/homebrew/bin/node",
     "/opt/homebrew/opt/node/bin/node",
@@ -100,7 +109,9 @@ function defaultNodeLauncherCandidates(home = homedir()): string[] {
  * future `brew upgrade node` (or equivalent) keeps the background sync working
  * instead of crash-looping with an `OS_REASON_DYLD` failure. Falls back to
  * `execPath` when no stable alternative points at the running runtime, matching
- * the previous behaviour for setups without a stable symlink (e.g. nvm/fnm).
+ * the previous behaviour for setups without a stable symlink (e.g. nvm). fnm's
+ * per-shell `fnm_multishells` links are deleted when the shell exits, so those
+ * resolve to the installed version instead.
  */
 export function stableLauncherNodePath(
   options: {
@@ -129,6 +140,7 @@ export function stableLauncherNodePath(
     }
   }
 
+  if (/[\\/]fnm_multishells[\\/]/.test(execPath)) return target;
   return execPath;
 }
 
@@ -139,24 +151,6 @@ export function launchdHealthFromReport(
   if (/successive crashes = [1-9]\d*|last exit reason = OS_REASON_DYLD/.test(report)) return "crash_loop";
   if (!options.hasLauncher) return "repair_required";
   return options.launcherAvailable ? "healthy" : "runtime_unavailable";
-}
-
-const normalizeProviderListForEnv = (providers: SourceProvider[]): string =>
-  providers.length > 0 ? providers.join(",") : CONFIG_DISABLED_PROVIDERS_SENTINEL;
-
-export function envForService(
-  config: CollectorConfig,
-  credential?: Pick<CollectorCredential, "enabled_providers"> | null
-): Record<string, string> {
-  const enabledProviders = credential?.enabled_providers ?? config.enabledProviders;
-  return {
-    CODEX_HOME: config.codexHome,
-    TRMNL_TOKEN_METER_CONFIG_DIR: config.configDir,
-    TRMNL_TOKEN_METER_CACHE_DIR: config.cacheDir,
-    TRMNL_TOKEN_METER_INCLUDE_PI_SESSIONS: config.includePiSessions ? "1" : "0",
-    PI_HOME: config.piSessionsHome,
-    TRMNL_TOKEN_METER_ENABLED_PROVIDERS: normalizeProviderListForEnv(enabledProviders)
-  };
 }
 
 function currentRuntimeDir(): string {
@@ -412,6 +406,9 @@ export async function installBackgroundService(
   if (platform() === "darwin") {
     await installLaunchd(config, runner, intervalMinutes, launcher, runAtLoad, runCommand, options.credential);
     method = "launchd";
+  } else if (platform() === "win32") {
+    await installScheduledTask(config, runner, intervalMinutes, launcher, runAtLoad, runCommand, options.credential);
+    method = "schtasks";
   } else if (platform() === "linux") {
     try {
       await installSystemd(config, runner, intervalMinutes, launcher, runAtLoad, runCommand, options.credential);
@@ -459,6 +456,8 @@ export async function uninstallBackgroundService(
       force: true
     });
     await runCommand("systemctl", ["--user", "daemon-reload"]).catch(() => undefined);
+  } else if (metadata?.method === "schtasks") {
+    await uninstallScheduledTask(config, runCommand);
   } else if (metadata?.method === "cron") {
     const existing = await execFileAsync("crontab", ["-l"]).then(
       (result) => String(result.stdout),
@@ -601,6 +600,11 @@ async function schedulerInstalled(
     } catch {
       return { installed: false, health: "unknown" };
     }
+  }
+
+  if (metadata.method === "schtasks") {
+    if (!(await scheduledTaskInstalled(runCommand))) return { installed: false, health: "unknown" };
+    return { installed: true, health: await launcherHealth(metadata, readCommandText) };
   }
 
   if (metadata.method === "systemd") {

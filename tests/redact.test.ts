@@ -49,4 +49,44 @@ describe("collector redaction", () => {
     expect(redacted).not.toContain("CANARY_COOKIE_DO_NOT_UPLOAD");
     expect(redacted).not.toContain("sk_canarysecret123456");
   });
+
+  it("redacts Windows drive, forward-slash, long-path, and UNC paths", () => {
+    const samples = [
+      "open C:\\Users\\danielmunoz\\Repos\\private-project\\file.ts failed",
+      "open C:/Users/danielmunoz/Repos/private-project/file.ts failed",
+      "open \\\\?\\C:\\Users\\danielmunoz\\Repos\\private-project failed",
+      "open \\\\fileserver\\share\\danielmunoz\\private-project failed",
+      "ENOENT: no such file, open 'D:\\work\\danielmunoz\\private-project\\.codex\\x.jsonl'"
+    ];
+
+    for (const sample of samples) {
+      const redacted = redactText(sample);
+      expect(redacted).not.toContain("danielmunoz");
+      expect(redacted).not.toContain("private-project");
+      expect(redacted).not.toContain("fileserver");
+      expect(redacted).toMatch(/^(open|ENOENT)/);
+    }
+  });
+
+  it("redacts JSON-escaped Windows paths inside serialized objects", () => {
+    const redacted = redactText({
+      detail: "C:\\Users\\danielmunoz\\Repos\\private-project\\a.ts",
+      share: "\\\\fileserver\\share\\private-project"
+    });
+
+    expect(redacted).not.toContain("danielmunoz");
+    expect(redacted).not.toContain("private-project");
+    expect(redacted).not.toContain("fileserver");
+  });
+
+  it("does not prepend match offsets to redactions without a kept prefix", () => {
+    expect(redactText("contact me@danmunoz.example now")).toBe("contact [REDACTED] now");
+    expect(redactText("failed at C:\\Users\\dev\\repo")).toBe("failed at [REDACTED]");
+  });
+
+  it("leaves URLs and ratios alone", () => {
+    expect(redactText("see https://example.com/docs/page")).toBe("see https://example.com/docs/page");
+    expect(redactText("ratio 1:2/3")).toBe("ratio 1:2/3");
+  });
 });
+

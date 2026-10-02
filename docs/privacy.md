@@ -40,7 +40,7 @@ the backend configuration.
 
 The collector must not upload prompts, responses, tool output, file contents, diffs, shell commands, absolute paths, repository names, priority-tier SQL row details, OpenCode messages, OpenCode parts, OpenCode titles, OpenCode paths, OpenCode directories, OpenCode projects, OpenCode account metadata, Claude transcript content, Pi session contents, auth files, browser cookies, OpenAI API keys, TRMNL secrets, pairing codes, or collector bearer tokens.
 
-Tests include canary prompts, fake secrets, path-like strings, commands, repository-like names, and fake auth material. Serialized uploads and logs must not contain those canary values.
+Tests include canary prompts, fake secrets, path-like strings (POSIX paths and Windows drive, forward-slash, long-path, UNC, and JSON-escaped paths), commands, repository-like names, and fake auth material. Serialized uploads and logs must not contain those canary values.
 
 ## Backend Storage
 

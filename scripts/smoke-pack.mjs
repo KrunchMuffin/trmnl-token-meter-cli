@@ -8,7 +8,19 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
-const binName = process.platform === "win32" ? "trmnl-token-meter.cmd" : "trmnl-token-meter";
+const isWindows = process.platform === "win32";
+const binName = isWindows ? "trmnl-token-meter.cmd" : "trmnl-token-meter";
+
+const quoteForCmd = (value) => (/[\s"&|<>^]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value);
+
+/**
+ * Runs a package-manager command or npm bin shim. On Windows these are `.cmd`
+ * batch files, which Node.js only starts through a shell.
+ */
+function runShim(file, args, options) {
+  if (!isWindows) return execFileAsync(file, args, options);
+  return execFileAsync([file, ...args].map(quoteForCmd).join(" "), [], { ...options, shell: true });
+}
 
 async function listJsFiles(root) {
   const entries = await readdir(root, { withFileTypes: true });
@@ -27,12 +39,12 @@ async function listJsFiles(root) {
 }
 
 async function main() {
-  await execFileAsync("pnpm", ["build"], {
+  await runShim("pnpm", ["build"], {
     cwd: repoRoot,
     env: { ...process.env, npm_config_audit: "false", npm_config_fund: "false" }
   });
 
-  const { stdout } = await execFileAsync("npm", ["pack", "--json", "--ignore-scripts"], {
+  const { stdout } = await runShim("npm", ["pack", "--json", "--ignore-scripts"], {
     cwd: repoRoot,
     env: { ...process.env, npm_config_audit: "false", npm_config_fund: "false" }
   });
@@ -50,12 +62,12 @@ async function main() {
   const sandbox = await mkdtemp(join(tmpdir(), "trmnl-pack-smoke-"));
   try {
     await writeFile(join(sandbox, "package.json"), '{"name":"pack-smoke","private":true}\n');
-    await execFileAsync(
+    await runShim(
       "npm",
       ["install", "--ignore-scripts", "--no-audit", "--no-fund", join(repoRoot, tarball)],
       { cwd: sandbox }
     );
-    const { stdout: version } = await execFileAsync(
+    const { stdout: version } = await runShim(
       join(sandbox, "node_modules", ".bin", binName),
       ["--version"],
       { cwd: sandbox }

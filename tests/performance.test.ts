@@ -1,8 +1,9 @@
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { buildAggregate } from "../src/aggregate.js";
 import { readJsonlUsageSource } from "../src/cost-sources/jsonl.js";
 
-const fixtureRoot = new URL("./fixtures/codex-jsonl/default", import.meta.url).pathname;
+const fixtureRoot = fileURLToPath(new URL("./fixtures/codex-jsonl/default", import.meta.url));
 
 describe("collector performance", () => {
   it("completes typical one-shot collection well under 10 seconds", async () => {

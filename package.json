@@ -31,7 +31,8 @@
   },
   "os": [
     "darwin",
-    "linux"
+    "linux",
+    "win32"
   ],
   "bin": {
     "trmnl-token-meter": "dist/cli.js"
@@ -43,7 +44,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
     "dev": "tsx src/cli.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
