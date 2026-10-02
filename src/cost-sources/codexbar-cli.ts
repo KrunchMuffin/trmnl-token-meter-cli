@@ -20,11 +20,20 @@ export const CODEXBAR_COST_PROVIDERS: readonly SourceProvider[] = ["codex", "cla
 
 // Same discovery order the published CodexBar consumers use: an explicit override
 // first, then PATH, then the locations the in-app "Install CLI" step symlinks.
-const WELL_KNOWN_BINARY_PATHS = [
-  "/opt/homebrew/bin/codexbar",
-  "/usr/local/bin/codexbar",
-  "/Applications/CodexBar.app/Contents/Helpers/CodexBarCLI"
-];
+// CodexBar does not ship for Windows, so there are no well-known locations there;
+// an explicit `CODEXBAR_BIN` or a `codexbar.exe` on PATH is still honoured.
+const WELL_KNOWN_BINARY_PATHS =
+  process.platform === "win32"
+    ? []
+    : [
+        "/opt/homebrew/bin/codexbar",
+        "/usr/local/bin/codexbar",
+        "/Applications/CodexBar.app/Contents/Helpers/CodexBarCLI"
+      ];
+
+/** Windows only executes `.exe` files through `execFile`, never extensionless ones. */
+export const codexBarBinaryName = (os: NodeJS.Platform = process.platform): string =>
+  os === "win32" ? "codexbar.exe" : "codexbar";
 
 export const CODEXBAR_DEFAULT_DAYS = 30;
 export const CODEXBAR_DEFAULT_TIMEOUT_MS = 180_000;
@@ -246,7 +255,7 @@ const pathCandidates = (env: NodeJS.ProcessEnv): string[] => {
     .split(delimiter)
     .map((entry) => entry.trim())
     .filter(Boolean)
-    .map((entry) => join(entry, "codexbar"));
+    .map((entry) => join(entry, codexBarBinaryName()));
 };
 
 /**

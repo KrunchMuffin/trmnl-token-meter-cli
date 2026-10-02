@@ -17,7 +17,12 @@ installs background sync automatically.
 The background sync uses a stable local copy of the npm package runtime, so it
 does not depend on the temporary `npx` cache after setup. On macOS it installs a
 user `launchd` agent. On Linux it prefers a user `systemd` timer and falls back
-to cron when systemd user services are unavailable.
+to cron when systemd user services are unavailable. On Windows it registers a
+per-user Task Scheduler task (`trmnl-token-meter-sync`) that runs without
+elevation, wrapped in `conhost.exe --headless` on Windows 10 1809 and later so
+no console window appears. Because Task Scheduler cannot set per-task
+environment variables, the task passes an allowlisted `service-env.json` to the
+runner with `--service-env`.
 
 When you run a newer CLI release, the collector refreshes that installed runtime
 copy in place so background sync stays on the same version as the CLI you just

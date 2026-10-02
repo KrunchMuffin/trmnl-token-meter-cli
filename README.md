@@ -12,7 +12,7 @@ Privacy is the core design constraint: raw usage content stays on your machine. 
 
 ## Compatibility
 
-- Supported OS: macOS and Linux
+- Supported OS: macOS, Linux, and Windows 10 (1809) or later
 - Supported Node: `>=22.13.0`
 
 The package manifest enforces the OS restriction at install time.
@@ -271,6 +271,7 @@ After pairing, the CLI installs a local background job so the display keeps upda
 
 - macOS: `launchd`
 - Linux: `systemd` when available, otherwise `cron`
+- Windows: Task Scheduler (a per-user task named `trmnl-token-meter-sync`)
 
 The TRMNL management page controls the collector upload cadence with `1 hour`
 (default), `4 hours`, and `24 hours` presets. Running `status` or completing a
@@ -352,8 +353,8 @@ This is the best way to verify what would be sent. The output is the aggregate s
 
 The collector stores credentials, service metadata, and sync state locally on your machine.
 
-- `CODEX_HOME` controls where Codex usage files are read from. Default: `~/.codex`
-- `TRMNL_TOKEN_METER_OPENCODE_DB` points to a specific OpenCode SQLite database. Default: `~/.local/share/opencode/opencode.db`
+- `CODEX_HOME` controls where Codex usage files are read from. Default: `~/.codex` (`%USERPROFILE%\.codex` on Windows)
+- `TRMNL_TOKEN_METER_OPENCODE_DB` points to a specific OpenCode SQLite database. Default: `~/.local/share/opencode/opencode.db` (`%USERPROFILE%\.local\share\opencode\opencode.db` on Windows)
 - `TRMNL_TOKEN_METER_CLAUDE_CONFIG_DIR` or `TRMNL_TOKEN_METER_CLAUDE_PROJECTS_HOME` points to a Claude config or projects directory when auto-detection is not enough
 - `TRMNL_TOKEN_METER_API_BASE_URL` overrides the backend URL
 - `TRMNL_TOKEN_METER_CONFIG_DIR` overrides the config directory
@@ -371,8 +372,12 @@ Default local paths:
 - macOS cache/logs: `~/Library/Caches/trmnl-token-meter`
 - Linux config: `${XDG_CONFIG_HOME:-~/.config}/trmnl-token-meter`
 - Linux cache/logs: `${XDG_CACHE_HOME:-~/.cache}/trmnl-token-meter`
+- Windows config: `%LOCALAPPDATA%\trmnl-token-meter\Config`
+- Windows cache: `%LOCALAPPDATA%\trmnl-token-meter\Cache`
 
-Background service logs are written to the cache directory as `service.log` and `service.err.log`.
+On macOS and Linux, background service logs are written to the cache directory as
+`service.log` and `service.err.log`. Windows Task Scheduler does not capture
+output; use `status` for the last sync result.
 
 ## Project Policies
 
@@ -424,6 +429,9 @@ is a hand-maintained port that goes stale: a model released after this CLI shipp
 has no local price, so its usage counts tokens but reports no cost. CodexBar
 maintains its own rate card, so a model it already knows is priced correctly
 without waiting for a release here.
+
+CodexBar does not ship for Windows, so on Windows the collector uses the bundled
+catalog unless `CODEXBAR_BIN` points at a `codexbar.exe` or one is on `PATH`.
 
 The collector discovers the binary from `CODEXBAR_BIN`, then `PATH`, then the
 locations CodexBar's "Install CLI" step symlinks. It runs one local
@@ -492,6 +500,16 @@ Interactive setup installs background sync automatically.
 
 On macOS, the CLI installs a user `launchd` agent. On Linux, it prefers a user `systemd` timer and falls back to cron when systemd user services are unavailable.
 
+On Windows, it registers a per-user Task Scheduler task named
+`trmnl-token-meter-sync` that runs without administrator rights, only while you
+are signed in, and catches up after the computer was asleep or off. Task
+Scheduler cannot set per-task environment variables, so the task passes the
+collector settings through `service-env.json` next to the background runner;
+the runner only accepts the collector's own settings from that file. On Windows
+10 (1809) and later the task runs through `conhost.exe --headless` so no
+console window opens on each sync. Older builds run Node.js directly and briefly
+show a console window.
+
 When you run a newer CLI release, it refreshes the installed background runner copy in place so scheduled syncs keep using the current package version.
 
 The TRMNL management page controls the collector upload cadence with `1 hour`
@@ -521,5 +539,11 @@ The CLI stores its local credential and sync metadata in the platform config dir
 
 - macOS: `~/Library/Application Support/trmnl-token-meter`
 - Linux: `${XDG_CONFIG_HOME:-~/.config}/trmnl-token-meter`
+- Windows: `%LOCALAPPDATA%\trmnl-token-meter\Config`
+
+On Windows, POSIX file modes do not apply. The files instead inherit the
+permissions of your local (non-roaming) profile folder, which by default only
+your account, administrators, and `SYSTEM` can read. They are kept out of the
+roaming profile because the credential belongs to this machine.
 
 The collector credential is used only to authenticate this machine with your TRMNL Token Meter plugin. Revoking the machine invalidates that credential.

@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   codexBarDailyLanes,
   codexBarProviderArgument,
+  codexBarBinaryName,
   findCodexBarBinary,
   parseCodexBarCostPayload,
   parseCodexBarVersion,
@@ -204,7 +205,7 @@ describe("codexbar binary discovery", () => {
 
   it("does not fall through when CODEXBAR_BIN is not executable", async () => {
     const dir = await mkdtemp(join(tmpdir(), "codexbar-bin-"));
-    const onPath = await writeExecutable(join(dir, "codexbar"));
+    const onPath = await writeExecutable(join(dir, codexBarBinaryName()));
 
     expect(
       await findCodexBarBinary({ CODEXBAR_BIN: join(dir, "missing"), PATH: dir }, [])
@@ -219,6 +220,12 @@ describe("codexbar binary discovery", () => {
     expect(await findCodexBarBinary({ PATH: "" }, [join(dir, "absent"), installed])).toBe(
       installed
     );
+  });
+
+  it("looks for codexbar.exe on Windows PATH entries", () => {
+    expect(codexBarBinaryName("win32")).toBe("codexbar.exe");
+    expect(codexBarBinaryName("darwin")).toBe("codexbar");
+    expect(codexBarBinaryName("linux")).toBe("codexbar");
   });
 
   it("returns null when nothing is installed", async () => {

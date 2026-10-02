@@ -1,8 +1,9 @@
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  defaultCollectorDirs,
   deleteCredential,
   loadConfig,
   loadCredential,
@@ -30,18 +31,41 @@ describe("collector config", () => {
     });
 
     expect(config.apiBaseUrl).toBe("https://api.example.test");
-    expect(config.codexHome).toBe("/tmp/codex-custom");
+    expect(config.codexHome).toBe(resolve("/tmp/codex-custom"));
     expect(config.codexHomeKind).toBe("custom");
-    expect(config.credentialPath).toBe("/tmp/config/credentials.json");
-    expect(config.serviceDir).toBe("/tmp/config/service-runner");
-    expect(config.serviceMetadataPath).toBe("/tmp/config/service.json");
-    expect(config.serviceStatePath).toBe("/tmp/config/sync-state.json");
-    expect(config.updateCheckPath).toBe("/tmp/config/update-check.json");
-    expect(config.opencodeDbPath).toBe("/tmp/opencode/opencode.db");
-      expect(config.claudeProjectsRoots).toEqual([
-      "/tmp/claude-one/projects",
-      "/tmp/claude-two/projects"
+    expect(config.credentialPath).toBe(resolve("/tmp/config/credentials.json"));
+    expect(config.serviceDir).toBe(resolve("/tmp/config/service-runner"));
+    expect(config.serviceMetadataPath).toBe(resolve("/tmp/config/service.json"));
+    expect(config.serviceStatePath).toBe(resolve("/tmp/config/sync-state.json"));
+    expect(config.updateCheckPath).toBe(resolve("/tmp/config/update-check.json"));
+    expect(config.opencodeDbPath).toBe(resolve("/tmp/opencode/opencode.db"));
+    expect(config.claudeProjectsRoots).toEqual([
+      resolve("/tmp/claude-one/projects"),
+      resolve("/tmp/claude-two/projects")
     ]);
+  });
+
+  it("keeps Windows config and cache under the local (non-roaming) app data folder", () => {
+    expect(
+      defaultCollectorDirs({ LOCALAPPDATA: "C:\\Users\\dev\\AppData\\Local" }, "win32", "C:\\Users\\dev")
+    ).toEqual({
+      configDir: join("C:\\Users\\dev\\AppData\\Local", "trmnl-token-meter", "Config"),
+      cacheDir: join("C:\\Users\\dev\\AppData\\Local", "trmnl-token-meter", "Cache")
+    });
+    expect(defaultCollectorDirs({}, "win32", "C:\\Users\\dev").configDir).toBe(
+      join("C:\\Users\\dev", "AppData", "Local", "trmnl-token-meter", "Config")
+    );
+  });
+
+  it("keeps macOS and Linux default directories unchanged", () => {
+    expect(defaultCollectorDirs({}, "darwin", "/Users/dev")).toEqual({
+      configDir: join("/Users/dev", "Library", "Application Support", "trmnl-token-meter"),
+      cacheDir: join("/Users/dev", "Library", "Caches", "trmnl-token-meter")
+    });
+    expect(defaultCollectorDirs({ XDG_CONFIG_HOME: "/xdg/config" }, "linux", "/home/dev")).toEqual({
+      configDir: join("/xdg/config", "trmnl-token-meter"),
+      cacheDir: join("/home/dev", ".cache", "trmnl-token-meter")
+    });
   });
 
   it("defaults enabled providers to codex when env override is missing", () => {

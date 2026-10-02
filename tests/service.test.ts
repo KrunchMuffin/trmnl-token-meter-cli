@@ -272,6 +272,28 @@ describe("stableLauncherNodePath", () => {
     ).toBe(nvm);
   });
 
+  it("resolves fnm's temporary per-shell links to the installed version", () => {
+    const multishell = "/run/user/1000/fnm_multishells/4242_1747300000000/bin/node";
+    const installed = "/home/dev/.local/share/fnm/node-versions/v24.1.0/installation/bin/node";
+    const realpath = (path: string): string => {
+      if (path === multishell) return installed;
+      throw new Error(`ENOENT: ${path}`);
+    };
+    expect(
+      stableLauncherNodePath({ execPath: multishell, candidates: [brewSymlink], realpath })
+    ).toBe(installed);
+
+    const windowsMultishell = "C:\\Users\\dev\\AppData\\Local\\fnm_multishells\\4242_1747300000000\\node.exe";
+    const windowsInstalled = "C:\\Users\\dev\\AppData\\Roaming\\fnm\\node-versions\\v24.1.0\\installation\\node.exe";
+    expect(
+      stableLauncherNodePath({
+        execPath: windowsMultishell,
+        candidates: [],
+        realpath: (path) => (path === windowsMultishell ? windowsInstalled : path)
+      })
+    ).toBe(windowsInstalled);
+  });
+
   it("falls back to execPath when the running binary cannot be resolved", () => {
     const realpath = (path: string): string => {
       if (path === cellar) throw new Error("ENOENT");

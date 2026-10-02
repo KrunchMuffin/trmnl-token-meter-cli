@@ -7,7 +7,7 @@ import type { CollectorWarning, SessionUsageRecord } from "../types.js";
 import { warning } from "../warnings.js";
 import { localDateKey, type JsonlSourceResult } from "./jsonl.js";
 
-interface ClaudeUsageRow {
+export interface ClaudeUsageRow {
   day: string;
   timestamp: Date;
   model: string;
@@ -121,8 +121,8 @@ function normalizeClaudeModel(raw: string): string {
   return trimmed;
 }
 
-function pathRole(path: string): ClaudeUsageRow["pathRole"] {
-  return path.includes("/subagents/") ? "subagent" : "parent";
+export function claudePathRole(path: string): ClaudeUsageRow["pathRole"] {
+  return /[\\/]subagents[\\/]/.test(path) ? "subagent" : "parent";
 }
 
 function parseClaudeLine(line: string, path: string): ClaudeUsageRow | null {
@@ -170,7 +170,7 @@ function parseClaudeLine(line: string, path: string): ClaudeUsageRow | null {
     ...(messageId ? { messageId } : {}),
     ...(requestId ? { requestId } : {}),
     isSidechain: booleanField(object.isSidechain),
-    pathRole: pathRole(path),
+    pathRole: claudePathRole(path),
     input,
     cacheRead,
     cacheCreation,

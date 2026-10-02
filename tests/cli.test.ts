@@ -1,11 +1,12 @@
 import { mkdir, mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { main } from "../src/cli.js";
 import { saveCredential } from "../src/config.js";
 
-const fixtureRoot = new URL("./fixtures/codex-jsonl/default", import.meta.url).pathname;
+const fixtureRoot = fileURLToPath(new URL("./fixtures/codex-jsonl/default", import.meta.url));
 
 describe("collector CLI", () => {
   let stdout = "";
