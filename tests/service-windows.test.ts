@@ -111,6 +111,15 @@ describe("renderScheduledTaskXml", () => {
     );
   });
 
+  it("orders TimeTrigger children as the triggerBaseType schema sequence requires", () => {
+    const xml = renderScheduledTaskXml({ action, intervalMinutes: 15, runAtLoad: true, now, userId: null });
+    const trigger = xml.slice(xml.indexOf("<TimeTrigger>"), xml.indexOf("</TimeTrigger>"));
+    const order = ["<Enabled>", "<StartBoundary>", "<Repetition>"].map((tag) => trigger.indexOf(tag));
+
+    expect(order.every((index) => index > 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+  });
+
   it("defers the first run of a repaired task by a full interval", () => {
     const xml = renderScheduledTaskXml({ action, intervalMinutes: 60, runAtLoad: false, now, userId: null });
 

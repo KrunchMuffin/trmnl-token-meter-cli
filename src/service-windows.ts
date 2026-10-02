@@ -127,6 +127,9 @@ export function renderScheduledTaskXml(options: {
   const start = new Date(now.getTime() + startDelayMinutes * 60_000);
   const userId = options.userId?.trim();
   const args = options.action.args.map(quoteWindowsArg).join(" ");
+  // Trigger children follow triggerBaseType, an xs:sequence in the Task
+  // Scheduler schema (Enabled, StartBoundary, EndBoundary, Repetition); every
+  // other element used here sits in an xs:all and may appear in any order.
   return `<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo>
@@ -134,12 +137,12 @@ export function renderScheduledTaskXml(options: {
   </RegistrationInfo>
   <Triggers>
     <TimeTrigger>
+      <Enabled>true</Enabled>
+      <StartBoundary>${localTaskTimestamp(start)}</StartBoundary>
       <Repetition>
         <Interval>PT${interval}M</Interval>
         <StopAtDurationEnd>false</StopAtDurationEnd>
       </Repetition>
-      <StartBoundary>${localTaskTimestamp(start)}</StartBoundary>
-      <Enabled>true</Enabled>
     </TimeTrigger>
   </Triggers>
   <Principals>
