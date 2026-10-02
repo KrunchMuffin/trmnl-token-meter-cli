@@ -1,13 +1,14 @@
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { buildAggregate } from "../src/aggregate.js";
 import { loadConfig } from "../src/config.js";
 import { scanLocalCostSources } from "../src/cost-scan.js";
 import { serializeAggregateForUpload } from "../src/upload.js";
 
-const fixtureRoot = new URL("./fixtures/codex-jsonl/default", import.meta.url).pathname;
+const fixtureRoot = fileURLToPath(new URL("./fixtures/codex-jsonl/default", import.meta.url));
 const writeJsonl = async (path: string, lines: string[]) => {
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, `${lines.join("\n")}\n`);
@@ -61,6 +62,10 @@ const canaries = [
   "CANARY_TOOL_OUTPUT_DO_NOT_UPLOAD",
   "/Users/danielmunoz/Repos/private-project",
   "cat /Users/danielmunoz/.ssh/id_rsa",
+  "danielmunoz",
+  "C:\\Users",
+  "C:\\\\Users",
+  "fileserver",
   "CANARY_TITLE_DO_NOT_UPLOAD",
   "CANARY_DIRECTORY_DO_NOT_UPLOAD",
   "CANARY_PATH_DO_NOT_UPLOAD",
@@ -88,7 +93,9 @@ describe("privacy canaries", () => {
           model: "claude-sonnet-4-5-20250929",
           usage: { input_tokens: 50, cache_creation_input_tokens: 5, cache_read_input_tokens: 2, output_tokens: 19 },
           content: "CANARY_RESPONSE_DO_NOT_UPLOAD"
-        }
+        },
+        cwd: "C:\\Users\\danielmunoz\\Repos\\private-project",
+        gitRoot: "\\\\fileserver\\share\\private-project"
       })
     ]);
     const config = loadConfig({

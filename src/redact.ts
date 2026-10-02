@@ -45,9 +45,13 @@ const SECRET_PATTERNS: RegExp[] = [
   /Bearer\s+[A-Za-z0-9._~+/=-]+/gi,
   /([A-Za-z0-9_]*token[A-Za-z0-9_]*["']?\s*[:=]\s*["']?)[^"',\s}]+/gi,
   /([A-Za-z0-9_]*secret[A-Za-z0-9_]*["']?\s*[:=]\s*["']?)[^"',\s}]+/gi,
-  /([A-Z0-9]{4})-[A-Z0-9]{4}/gi,
+  // Windows drive paths with either separator, including JSON-escaped `\\`
+  // separators and `\\?\` long-path prefixes (`C:\Users\…`, `C:/Users/…`).
+  /\b[A-Za-z]:[\\/]+(?:[^\\/\s"'(){}]+[\\/]+)+[^\\/\s"'(){}]+/g,
+  // Windows UNC paths (`\\server\share\…`), raw or JSON-escaped.
+  /(^|[\s"'(=])\\{2,}[^\\/\s"'(){}]+(?:\\+[^\\/\s"'(){}]+)+/gm,
   /(^|[\s"'(])\/(?:[^/\s"'(){}]+\/)+[^/\s"'(){}]+/gm,
-  /\b[A-Za-z]:\\(?:[^\\\s"'(){}]+\\)+[^\\\s"'(){}]+\b/g,
+  /([A-Z0-9]{4})-[A-Z0-9]{4}/gi,
   /\b(?:SELECT|INSERT|UPDATE|DELETE)\b[\s\S]{0,120}/gi,
   /CANARY_[A-Z0-9_]+/g,
   /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g,
@@ -66,8 +70,10 @@ export function redactText(input: unknown): string {
   let text = typeof input === "string" ? input : JSON.stringify(input);
   if (!text) return "";
   for (const pattern of SECRET_PATTERNS) {
-    text = text.replace(pattern, (match, prefix: string | undefined) =>
-      prefix ? `${prefix}${REDACTED}` : REDACTED
+    // Patterns without a capture group receive the match offset (a number) in
+    // the second callback slot; only a captured string is a prefix to keep.
+    text = text.replace(pattern, (_match, prefix: unknown) =>
+      typeof prefix === "string" && prefix ? `${prefix}${REDACTED}` : REDACTED
     );
   }
   return text;
